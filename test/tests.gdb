@@ -63,10 +63,11 @@ continue 5
 expectPORTC 0x01
 checkResult
 
-test "PINA: 0x0F => PORTC: 0x00"
+# PC7 is 1 because the lot is full
+test "PINA: 0x0F => PORTC: 0x80"
 setPINA 0x0F
 continue 5
-expectPORTC 0x00
+expectPORTC 0x80
 checkResult
 
 # Report on how many tests passed/tests ran
