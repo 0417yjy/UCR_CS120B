@@ -1,7 +1,31 @@
-Breakpoint 1 at 0xea: file source/main.c, line 20.
+Breakpoint 1 at 0x10a: file source/main.c, line 20.
 Note: automatically using hardware breakpoints for read-only addresses.
+
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x000001b0 in ?? ()
 ======================================================
 Running all tests..."
 
-"PINA: 0x00 => PORTB: 0x00"..."PINA: 0x01 => PORTB: 0x01"..."PINA: 0x10 => PORTB: 0x00"..."PINA: 0x03 => PORTB: 0x00"...======================================================
+"PINA: 0x00 => PORTC: 0x04"...
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x000001bc in ?? ()
+"PINA: 0x02 => PORTC: 0x03"...
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x000001a0 in ?? ()
+"PINA: 0x04 => PORTC: 0x03"...
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x0000017a in ?? ()
+"PINA: 0x05 => PORTC: 0x02"...
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x0000016e in ?? ()
+"PINA: 0x0A => PORTC: 0x02"...
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x000001ce in ?? ()
+"PINA: 0x0D => PORTC: 0x01"...
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x00000166 in ?? ()
+"PINA: 0x0F => PORTC: 0x00"...
+Program received signal SIGTRAP, Trace/breakpoint trap.
+0x0000016c in ?? ()
+======================================================
 Quitting: Remote doesn't know how to detach
