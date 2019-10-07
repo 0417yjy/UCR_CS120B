@@ -27,10 +27,10 @@ echo ======================================================\n
 echo Running all tests..."\n\n
 
 # Add tests below
-test "PINA: 0 => PORTC: 0x60"
+test "PINA: 0 => PORTC: 0x40"
 setPINA 0
 continue 5
-expectPORTC 0x60
+expectPORTC 0x40
 checkResult
 
 test "PINA: 3 => PORTC: 0x70"
