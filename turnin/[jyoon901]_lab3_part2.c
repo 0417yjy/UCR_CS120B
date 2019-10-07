@@ -26,6 +26,7 @@ int main(void) {
 		switch(tmpA) {
 		case 0: //empty
 		tmpC = 0x40; //PORTC : 01000000 (lights only Low fuel)
+		break;
 
 		case 1: case 2:
 		tmpC = 0x60; //PORTC : 01100000 (lights PC5 and Low fuel)
