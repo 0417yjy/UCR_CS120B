@@ -27,47 +27,39 @@ echo ======================================================\n
 echo Running all tests..."\n\n
 
 # Add tests below
-test "PINA: 0x00 => PORTC: 0x04"
+test "PINA: 0x00, PINB: 0x00 => PORTC: 0x00"
 setPINA 0x00
+setPINB 0x00
 continue 5
-expectPORTC 0x04
+expectPORTC 0x00
 checkResult
 
-test "PINA: 0x02 => PORTC: 0x03"
-setPINA 0x02
-continue 5
-expectPORTC 0x03
-checkResult
-
-test "PINA: 0x04 => PORTC: 0x03"
-setPINA 0x04
-continue 5
-expectPORTC 0x03
-checkResult
-
-test "PINA: 0x05 => PORTC: 0x02"
-setPINA 0x05
-continue 5
-expectPORTC 0x02
-checkResult
-
-test "PINA: 0x0A => PORTC: 0x02"
-setPINA 0x0A
-continue 5
-expectPORTC 0x02
-checkResult
-
-test "PINA: 0x0D => PORTC: 0x01"
-setPINA 0x0D
+test "PINA: 0x08, PINB: 0x00 => PORTC: 0x01"
+setPINA 0x08
+setPINB 0x00
 continue 5
 expectPORTC 0x01
 checkResult
 
-# PC7 is 1 because the lot is full
-test "PINA: 0x0F => PORTC: 0x80"
-setPINA 0x0F
+test "PINA: 0x40, PINB: 0x03 => PORTC: 0x03"
+setPINA 0x40
+setPINB 0x03
 continue 5
-expectPORTC 0x80
+expectPORTC 0x03
+checkResult
+
+test "PINA: 0x2F, PINB: 0xAA => PORTC: 0x09"
+setPINA 0x2F
+setPINB 0xAA
+continue 5
+expectPORTC 0x09
+checkResult
+
+test "PINA: 0xFF, PINB: 0x5F => PORTC: 0x0E"
+setPINA 0xFF
+setPINB 0x5F
+continue 5
+expectPORTC 0x0E
 checkResult
 
 # Report on how many tests passed/tests ran
