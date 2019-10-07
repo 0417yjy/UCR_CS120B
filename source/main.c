@@ -23,9 +23,12 @@ int main(void) {
 		tmpA = PINA & 0x0F;
 
 		// 2) Compute
+
+		//compute fuel levels
 		switch(tmpA) {
 		case 0: //empty
 		tmpC = 0x40; //PORTC : 01000000 (lights only Low fuel)
+		break;
 
 		case 1: case 2:
 		tmpC = 0x60; //PORTC : 01100000 (lights PC5 and Low fuel)
@@ -54,6 +57,14 @@ int main(void) {
 		default: //error: would never come to here
 		tmpC = 0x00;
 		break;
+		}
+
+		//compute "fasten seatbelt" icon
+		tmpA = PINA & 0xE0; //Read the PA4..PA6 bits
+		if(tmpA == 0x60) {//true if PA4..PA6 is 110 
+				//meaning key is in the ignition, driver is seated, belt isn't fastened
+
+			tmpC = tmpC | 0x80; //set PC7 to 1
 		}
 
 		// 3) Write output

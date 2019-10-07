@@ -27,34 +27,37 @@ echo ======================================================\n
 echo Running all tests..."\n\n
 
 # Add tests below
-test "PINA: 0 => PORTC: 0x60"
-setPINA 0
+#fasten seatbelt on
+test "PINA: 0x60 => PORTC: 0xC0"
+setPINA 0x60
 continue 5
-expectPORTC 0x60
+expectPORTC 0xC0
 checkResult
 
-test "PINA: 3 => PORTC: 0x70"
-setPINA 3
+test "PINA: 0x23 => PORTC: 0x70"
+setPINA 0x23
 continue 5
 expectPORTC 0x70
 checkResult
 
-test "PINA: 6 => PORTC: 0x38"
-setPINA 6
+#fasten seatbelt on
+test "PINA: 0x66 => PORTC: 0B8"
+setPINA 0x66
 continue 5
-expectPORTC 0x38
+expectPORTC 0xB8
 checkResult
 
-test "PINA: 10 => PORTC: 0x3E"
-setPINA 10
+test "PINA: 0x4A => PORTC: 0x3E"
+setPINA 0x4A
 continue 5
 expectPORTC 0x3E
 checkResult
 
-test "PINA: 15 => PORTC: 0x3F"
-setPINA 15
+#fasten seatbelt on
+test "PINA: 0x6F => PORTC: 0xBF"
+setPINA 0x6F
 continue 5
-expectPORTC 0x3F
+expectPORTC 0xBF
 checkResult
 
 # Report on how many tests passed/tests ran
