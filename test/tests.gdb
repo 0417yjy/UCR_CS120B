@@ -27,37 +27,52 @@ echo ======================================================\n
 echo Running all tests..."\n\n
 
 # Add tests below
-#fasten seatbelt on
-test "PINA: 0x60 => PORTC: 0xC0"
-setPINA 0x60
+#weight is 3
+test "PIND: 0x00, PINB: 0x01 => PORTB: 0x01"
+setPIND 0x00
+setPINB 0x01
 continue 5
-expectPORTC 0xC0
+expectPORTB 0x01
 checkResult
 
-test "PINA: 0x23 => PORTC: 0x70"
-setPINA 0x23
+#weight is 2
+test "PIND: 0x01, PINB: 0x00 => PORTB: 0x00"
+setPIND 0x01
+setPINB 0x00
 continue 5
-expectPORTC 0x70
+expectPORTB 0x00
 checkResult
 
-#fasten seatbelt on
-test "PINA: 0x66 => PORTC: 0B8"
-setPINA 0x66
+#weight is 30
+test "PIND: 0x0F, PINB: 0x00 => PORTB: 0x04"
+setPIND 0x0F
+setPINB 0x00
 continue 5
-expectPORTC 0xB8
+expectPORTB 0x04
 checkResult
 
-test "PINA: 0x4A => PORTC: 0x3E"
-setPINA 0x4A
+#weight is 51
+test "PIND: 0x19, PINB: 0x01 => PORTB: 0x05"
+setPIND 0x19
+setPINB 0x01
 continue 5
-expectPORTC 0x3E
+expectPORTB 0x05
 checkResult
 
-#fasten seatbelt on
-test "PINA: 0x6F => PORTC: 0xBF"
-setPINA 0x6F
+#weight is 500
+test "PIND:0xFC, PINB: 0x00 => PORTB: 0x02"
+setPIND 0xFC
+setPINB 0x00
 continue 5
-expectPORTC 0xBF
+expectPORTB 0x02
+checkResult
+
+#weight is 75
+test "PIND: 0x25, PINB: 0x01 => PORTB: 0x03"
+setPIND 0x25
+setPINB 0x01
+continue 5
+expectPORTB 0x03
 checkResult
 
 # Report on how many tests passed/tests ran

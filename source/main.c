@@ -26,17 +26,17 @@ int main(void) {
 
 		// 2) Compute
 
-		//compute exact weight and store
-		passengerWeight = tmpD + tmpB * 0x100;
+		//compute weight and store
+		//inputs are PD7..PD0PB0
+		passengerWeight = tmpD * 2 + tmpB;
 
 		//compute outputs of port B
 		if(passengerWeight >= 70) { //if the weight is equal to or above 70 pounds
-			tmpB = tmpB | 0x02 //set PB1 to 1
+			tmpB = tmpB | 0x02; //set PB1 to 1
 		} else if(passengerWeight < 70 && passengerWeight > 5) {
-			tmpB = tmpB | 0x04 //set PB2 to 1
+			tmpB = tmpB | 0x04; //set PB2 to 1
 		} else {
 			//neither B1 nor B2 should be set if the weight is 5 or less
-
 			//do nothing
 		}
 
