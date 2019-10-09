@@ -27,25 +27,44 @@ echo ======================================================\n
 echo Running all tests..."\n\n
 
 # Add tests below
-test "PINA: 0xDE => PINB: 0x0D, PORTC: 0xE0"
-setPINA 0xDE
-continue 5
-expectPORTB 0x0D
-expectPORTC 0xE0
+
+#press button and release once
+test "PINA: 0x01, 0x00 => PORTB: 0x02, state: releasedPB1"
+set state = releasedPB0
+setPINA 0x01
+continue 2
+setPINA 0x00
+continue 2
+expectPORTB 0x02
+expect state releasedPB1
 checkResult
 
-test "PINA: 0x3A => PINB: 0x03, PORTC: 0xA0"
-setPINA 0x3A
-continue 5
-expectPORTB 0x03
-expectPORTC 0xA0
+#press button twice
+test "PINA: 0x01, 0x00, 0x01, 0x00 => PORTB: 0x01, state: releasedPB0"
+set state = releasedPB0
+setPINA 0x01
+continue 2
+setPINA 0x00
+continue 2
+setPINA 0x01
+continue 2
+setPINA 0x00
+continue 2
+expectPORTB 0x01
+expect state releasedPB0
 checkResult
 
-test "PINA: 0xFD => PINB: 0x0F, PORTC: 0xD0"
-setPINA 0xFD
-continue 5
-expectPORTB 0x0F
-expectPORTC 0xD0
+#press button, release, and hold
+test "PINA: 0x01, 0x00, 0x01 => PORTB: 0x01, state: pressedPB0"
+set state = releasedPB0
+setPINA 0x01
+continue 2
+setPINA 0x00
+continue 2
+setPINA 0x01
+continue 2
+expectPORTB 0x01
+expect state pressedPB0
 checkResult
 
 # Report on how many tests passed/tests ran
