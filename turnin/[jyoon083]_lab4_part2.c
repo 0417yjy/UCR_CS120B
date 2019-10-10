@@ -20,14 +20,13 @@ int pressToControlPortCValue(int, boolean*);
 int main(void) {
     /* Insert DDR and PORT initializations */
     DDRA = 0x00; PORTA = 0xFF;
-    DDRC = 0xFF; PORTC = 0x07;
+    DDRC = 0xFF; PORTC = 0x00;
 
     /* Insert your solution below */
     States state = init;
     boolean flag = false; // flag shows whether incrementing or decrementing is executed
 			// both incrementing and decrementing needs that the flag is 0
 			// each execution makes the flag 1
-    //PORTC = 0x07; // initialize PORTC to 7
     while (1) {
         state = pressToControlPortCValue(state, &flag);
     }
@@ -35,7 +34,6 @@ int main(void) {
 }
 
 int pressToControlPortCValue(int state, boolean *flag) {
-    //unsigned char PORTC = PORTC;
     unsigned char A0 = (PINA & 0x01); //get PA0
     unsigned char A1 = (PINA & 0x02) >> 1; //get PA1
 
@@ -90,28 +88,25 @@ int pressToControlPortCValue(int state, boolean *flag) {
     }
     switch (state) { // Actions
 	case init:
-		PORTC = 0x07; // initialize PORTC to 7
-		*flag = false;
 		break;
 	case wait:
-		*flag = false;
+		*flag = false; // enable incrementing or decrementing
 		break;
 	case pressA0:
 		if(PORTC < 9 && (*flag) == false) {
 			PORTC++;
-			*flag = true;
+			*flag = true; // disable incrementing
 		}
 		break;
 	case pressA1:
 		if(PORTC > 0 && (*flag) == false) {
 			PORTC--;
-			*flag = true;
+			*flag = true; // disable decrementing
 		}
 		break;
 	case reset:
 		PORTC = 0; // reset PORTC to 0
 		break;
     }
-    //PORTC = tmpC;
     return state;
 }

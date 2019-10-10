@@ -1,7 +1,7 @@
 /*	Author: Jongyeon Yoon
  *      Partner(s) Name: Weifeng
  *	Lab Section:021
- *	Assignment: Lab #4  Exercise #4
+ *	Assignment: Lab #4  Exercise #3
  *	Exercise Description: [optional - include for your own benefit]
  *
  *	I acknowledge all content contained herein, excluding template or example
@@ -69,11 +69,10 @@ int deadBoltSystem(int state) {
 		break;
 	case unlockSeq2: // press A1 to unlock
 			// otherwise, lock the door(A7) or reset(A0 or A1)
-		if(A1 && !(A0 || A2 || A7) && !(PORTB & 0x01)) { // if door is locked, unlock the door
+		if(A1 && !(A0 || A2 || A7)) { // unlock the door
 			state = unlock;
 		}
-		else if((A7 && !(A0 || A1 || A2)) || (A1 && !(A0 || A2 || A7) && (PORTB & 0x01))) {
-			// if door is unlocked, lock the door
+		else if(A7 && !(A0 || A1 || A2)) { // lock the door
 			state = lock;
 		}
 		else if((A0 && !(A1 || A2 || A7)) || (A2 && !(A0 || A1 || A7))) { // reset

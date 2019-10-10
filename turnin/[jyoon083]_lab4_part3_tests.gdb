@@ -90,30 +90,6 @@ expectPORTC 0x03
 expect state unlockSeq2
 checkResult
 
-#lock by press the code when unlocked
-test "PINA: 0x04, 0x00, 0x02, 0x00, 0x04, 0x00, 0x02, 0x00 => PORTB: 0x00, PORTC: 0x00, state: wait"
-set state = wait
-setPINA 0x04
-continue 5
-setPINA 0x00
-continue 5
-setPINA 0x02
-continue 5
-setPINA 0x00
-continue 5
-setPINA 0x04
-continue 5
-setPINA 0x00
-continue 5
-setPINA 0x02
-continue 5
-setPINA 0x00
-continue 5
-expectPORTB 0x00
-expectPORTC 0x00
-expect state wait
-checkResult
-
 # Report on how many tests passed/tests ran
 set $passed=$tests-$failed
 eval "shell echo Passed %d/%d tests.\n",$passed,$tests
