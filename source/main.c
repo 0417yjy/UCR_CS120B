@@ -1,7 +1,7 @@
 /*	Author: Jongyeon Yoon
  *      Partner(s) Name: Weifeng
  *	Lab Section:021
- *	Assignment: Lab #4  Exercise #4
+ *	Assignment: Lab #4  Exercise #5
  *	Exercise Description: [optional - include for your own benefit]
  *
  *	I acknowledge all content contained herein, excluding template or example
@@ -12,19 +12,27 @@
 #include "simAVRHeader.h"
 #endif
 
-typedef enum States {wait, lock, unlockSeq1, unlockSeq2, unlock } States;
-//typedef enum boolean {false, true} boolean;
+#define B0 (PORTB & 0x01)
+
+typedef enum States {init, wait, lock, press, unlock } States;
+
+unsigned char buttonSeq[4]; // globalscope array variable that stores button sequence
+unsigned char flag; // check if button was stored in buttonSeq (used for guaranteeing that button is stored only once)
 
 int deadBoltSystem(int);
 
 int main(void) {
+    unsigned char i; // used in for loop
     /* Insert DDR and PORT initializations */
     DDRA = 0x00; PORTA = 0xFF;
     DDRB = 0xFF; PORTB = 0x00;
     DDRC = 0xFF; PORTC = 0x00;
 
     /* Insert your solution below */
-    States state = wait; //initialize state
+    for(i=0;i<4;i++) { //initialize buttonSeq
+	buttonSeq[i] = 0;
+    }
+    States state = init; //initialize state
     PORTC = 0; //write wait state to PORTC
     while (1) {
         state = deadBoltSystem(state);
@@ -33,84 +41,104 @@ int main(void) {
 }
 
 int deadBoltSystem(int state) {
+    unsigned char i; // used in for loop
     unsigned char A0 = (PINA & 0x01); //get PA0
-    unsigned char A1 = (PINA & 0x02) >> 1; //get PA1
-    unsigned char A2 = (PINA & 0x04) >> 2; //get PA2
-    unsigned char A7 = (PINA & 0x80) >> 7; //get PA7
+    unsigned char A1 = (PINA & 0x02); //get PA1
+    unsigned char A2 = (PINA & 0x04); //get PA2
+    unsigned char A7 = (PINA & 0x80); //get PA7
 
     switch (state) { // Transitions
 	/* All transitions are executed when only one button is pressed */
-	case wait:
-		if(A7 && !(A0 || A1 || A2)) { // A7 is pressed
-			state = lock; // lock the door
+	case init:
+		if(B0 == 0) {
+			state = wait;
 		}
-		else if(A2 && !(A0 || A1 || A7)) { // A2(#) is pressed
-			state = unlockSeq1; // proceed to next step for unlocking
+		else {
+			state = init;
+		}
+		break;
+	case wait:
+		if(((buttonSeq[0] == '#' && buttonSeq[1] == 'X' && buttonSeq[2] == 'Y' && buttonSeq[3] == 'X') && B0) || A7) {
+			// lock if door is unlocked and button sequence is "#XYX"
+			state = lock;
+		}
+		else if((buttonSeq[0] == '#' && buttonSeq[1] == 'X' && buttonSeq[2] == 'Y' && buttonSeq[3] == 'X') && !B0) { 
+			// unlock if door is locked and button sequence is "#XYX"
+			state = unlock;
+		}
+		else if(A0 || A1 || A2) { // if any button is pressed, store it into the array
+			state = press;
 		}
 		else {
 			state = wait;
 		}
 		break;
 	case lock: // hold present state or go back to wait state
-		if(A7) { // hold the button
+		if(!A7) { // release the A7 button
+			state = wait;
+		}
+		else { // hold all buttons
 			state = lock;
 		}
-		else if(!A7) { // release the button
+		break;
+	case press:
+		if(!(A0 || A1 || A2)) {
 			state = wait;
 		}
-		break;
-	case unlockSeq1: // hold present state or proceed to unlockSeq2 state
-		if(!A0 && !(A0 || A1 || A7)) { //release the button at A0
-			state = unlockSeq2;
-		}
-		else { // holding the button or other buttons are pressed
-			state = unlockSeq1;
+		else {
+			state = press;
 		}
 		break;
-	case unlockSeq2: // press A1 to unlock
-			// otherwise, lock the door(A7) or reset(A0 or A1)
-		if(A1 && !(A0 || A2 || A7) && !(PORTB & 0x01)) { // if door is locked, unlock the door
-			state = unlock;
-		}
-		else if((A7 && !(A0 || A1 || A2)) || (A1 && !(A0 || A2 || A7) && (PORTB & 0x01))) {
-			// if door is unlocked, lock the door
-			state = lock;
-		}
-		else if((A0 && !(A1 || A2 || A7)) || (A2 && !(A0 || A1 || A7))) { // reset
-			state = wait;
-		}
-		else { // press multiple buttons simultaneously or no buttons
-			state = unlockSeq2;
-		}
+	case unlock: //always go to the wait state
+		state = wait;
 		break;
-	case unlock: // hold present state or go back to wait state
-		if(A1) { // hold the button
-			state = unlock;
-		}
-		else if(!A1) { // release the button
-			state = wait;
-		}
-		break;
-	default: // cannot come to this state in normal way
+	default:
+		state = wait;
 		break;
     }
     switch (state) { // Actions
 	/* Always write the current state to PORTC */
-	case wait:
+	case init:
+		PORTB = 0x00; // initialize PB0 to 0
 		PORTC = 0;
+		break;
+	case wait:
+		flag = 0; // get ready to store the char pressed
+		PORTC = 1;
 		break;
 	case lock:
 		PORTB = PORTB & 0xFE; // make PB0 to 0: lock
-		PORTC = 1;
-		break;
-	case unlockSeq1:
+		for(i=0;i<4;i++) { //initialize buttonSeq again
+			buttonSeq[i] = 0;
+		}
 		PORTC = 2;
 		break;
-	case unlockSeq2:
+	case press:
+		if(flag == 0) {
+			//shift left once
+			buttonSeq[0] = buttonSeq[1];
+			buttonSeq[1] = buttonSeq[2];
+			buttonSeq[2] = buttonSeq[3];
+	
+			//push new char in idx 3
+			if(A0) {
+			  buttonSeq[3] = 'X';
+			}
+			else if(A1) {
+			  buttonSeq[3] = 'Y';
+			}
+			else if(A2) {
+			  buttonSeq[3] = '#';
+			}
+			flag = 1; // disable storing chars
+		}
 		PORTC = 3;
 		break;
 	case unlock:
 		PORTB = PORTB | 0x01; // make PB0 to 1: unlock
+		for(i=0;i<4;i++) { //initialize buttonSeq again
+			buttonSeq[i] = 0;
+		}
 		PORTC = 4;
 		break;
     }

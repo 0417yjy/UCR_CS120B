@@ -29,41 +29,103 @@ echo Running all tests..."\n\n
 # Add tests below
 
 #unlock the door
-test "PINA: 0x04, 0x00, 0x02, 0x00 => PORTB: 0x01, PORTC: 0x00, state: wait"
-set state = wait
+test "PINA: 0x04, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00 => PORTB: 0x01, PORTC: 0x00, state: wait"
+set state = init
 setPINA 0x04
 continue 5
 setPINA 0x00
 continue 5
+setPINA 0x01
+continue 5
+setPINA 0x00
+continue 5
 setPINA 0x02
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x01
 continue 5
 setPINA 0x00
 continue 5
 expectPORTB 0x01
-expectPORTC 0x00
+expectPORTC 0x01
 expect state wait
 checkResult
 
-#unlock the door and lock it (hold)
-test "PINA: 0x04, 0x00, 0x02, 0x00, 0x80 => PORTB: 0x00, PORTC: 0x01, state: lock"
-set state = wait
+#unlock the door and lock it by press A7 (hold)
+test "PINA: 0x04, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x80 => PORTB: 0x00, PORTC: 0x01, state: lock"
+set state = init
 setPINA 0x04
 continue 5
 setPINA 0x00
 continue 5
+setPINA 0x01
+continue 5
+setPINA 0x00
+continue 5
 setPINA 0x02
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x01
 continue 5
 setPINA 0x00
 continue 5
 setPINA 0x80
 continue 5
 expectPORTB 0x00
-expectPORTC 0x01
+expectPORTC 0x02
 expect state lock
 checkResult
 
-#unlock failure (press # X)
-test "PINA: 0x04, 0x00, 0x01, 0x00 => PORTB: 0x00, PORTC: 0x00, state: wait"
+#press #-X-Y-X(hold) : not unlocked yet
+test "PINA: 0x04, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01 => PORTB: 0x00, PORTC: 0x02, state: press"
+set state = init
+setPINA 0x04
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x01
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x02
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x01
+continue 5
+expectPORTB 0x00
+expectPORTC 0x03
+expect state press
+checkResult
+
+#press #-X-Y-Y : unlocking failed because of the wrong code
+test "PINA: 0x04, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02, 0x00 => PORTB: 0x00, PORTC: 0x00, state: wait"
+set state = init
+setPINA 0x04
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x01
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x02
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x02
+continue 5
+setPINA 0x00
+continue 5
+expectPORTB 0x00
+expectPORTC 0x01
+expect state wait
+checkResult
+
+#lock by press the code when unlocked
+test "PINA: 0x04, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02, 0x00, 0x04, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02, 0x00 => PORTB: 0x00, PORTC: 0x00, state: wait"
 set state = wait
 setPINA 0x04
 continue 5
@@ -73,27 +135,19 @@ setPINA 0x01
 continue 5
 setPINA 0x00
 continue 5
-expectPORTB 0x00
-expectPORTC 0x00
-expect state wait
-checkResult
-
-#wait for the 'Y' button to unlock
-test "PINA: 0x04, 0x00 => PORTB: 0x00, PORTC: 0x03, state: unlockSeq2"
-set state = wait
+setPINA 0x02
+continue 5
+setPINA 0x00
+continue 5
+setPINA 0x01
+continue 5
+setPINA 0x00
+continue 5
 setPINA 0x04
 continue 5
 setPINA 0x00
 continue 5
-expectPORTB 0x00
-expectPORTC 0x03
-expect state unlockSeq2
-checkResult
-
-#lock by press the code when unlocked
-test "PINA: 0x04, 0x00, 0x02, 0x00, 0x04, 0x00, 0x02, 0x00 => PORTB: 0x00, PORTC: 0x00, state: wait"
-set state = wait
-setPINA 0x04
+setPINA 0x01
 continue 5
 setPINA 0x00
 continue 5
@@ -101,16 +155,12 @@ setPINA 0x02
 continue 5
 setPINA 0x00
 continue 5
-setPINA 0x04
-continue 5
-setPINA 0x00
-continue 5
-setPINA 0x02
+setPINA 0x01
 continue 5
 setPINA 0x00
 continue 5
 expectPORTB 0x00
-expectPORTC 0x00
+expectPORTC 0x01
 expect state wait
 checkResult
 
