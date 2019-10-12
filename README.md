@@ -5,3 +5,5 @@ compile command : avr-gcc -mmcu=atmega1284 -I/usr/csshare/pkgs/simavr/ -Iheader/
 simulate command : simavr -v -v -v -v -g -m atmega1284 -f 8000000 build/objects/main.elf
 
 gtkwave command : gtkwave build/results/Lab2_introToAVR_trace.vcd
+
+compress command : tar -czvf [jyoon083]_lab[number].tgz turnin/
