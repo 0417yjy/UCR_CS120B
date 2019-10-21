@@ -8,6 +8,9 @@
  *	code, is my own original work.
  */
 #include <avr/io.h>
+#ifdef _SIMULATE_
+#include "simAVRHeader.h"
+#endif
 #include <avr/interrupt.h>
 
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clear to 0.
