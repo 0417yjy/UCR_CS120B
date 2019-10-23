@@ -9,15 +9,17 @@
  */
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#define SEC 1000
 
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clear to 0.
+unsigned char tick_cnt; // Used for counting
 
 // Internal variables for mapping AVR's ISR to our cleaner TimerISR model.
 unsigned long _avr_timer_M = 1; // Start count from here, down to 0. Default 1ms.
 unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
 
-typedef enum States {init, light_0, light_1, light_2} States;
-
+typedef enum States {init, lights_moving, lights_stopped, wait_reset, release_to_reset} States;	
+	
 void TimerOn() {
 	// AVR timer/counter controller register TCCR1
 	TCCR1B = 0x0B; // bit3 = 0: CTC mode (clear timer on compare)
@@ -69,20 +71,32 @@ void TimerSet(unsigned long M) {
 }
 
 int TickSM(int state) {
-	unsigned char tmpB = 0x00;
+	unsigned char A0 = ~PINA & 0x01;
 	
 	switch(state) { // Transitions
 		case init:
-			state = light_0;
+			tick_cnt = 0;
+			state = lights_moving;
 			break;
-		case light_0:
-			state = light_1;
+		case lights_moving:
+			if(A0) {
+				state = lights_stopped;
+			}
+			else if(!A0) {
+				tick_cnt++;
+				if(tick_cnt > 3) {
+					tick_cnt = 0;
+				}
+			}
 			break;
-		case light_1:
-			state = light_2;
+		case lights_stopped:
+			state = A0 ? lights_stopped : wait_reset;
 			break;
-		case light_2:
-			state = light_0;
+		case wait_reset:
+			state = A0 ? release_to_reset : wait_reset;
+			break;
+		case release_to_reset:
+			state = A0 ? release_to_reset : lights_moving;
 			break;
 		default:
 			state = init;
@@ -91,32 +105,35 @@ int TickSM(int state) {
 	switch(state) { // Actions
 		case init:
 			break;
-		case light_0:
-			tmpB = 0x01;
+		case lights_moving:
+			switch(tick_cnt) {
+				case 0: PORTB = 0x01; break;
+				case 1: PORTB = 0x02; break;
+				case 2: PORTB = 0x04; break;
+				case 3: PORTB = 0x02; break;
+			}
 			break;
-		case light_1:
-			tmpB = 0x02;
+		case lights_stopped:
 			break;
-		case light_2:
-			tmpB = 0x04;
+		case wait_reset:
+			break;
+		case release_to_reset:
+			tick_cnt = 0;
 			break;
 	}
-	PORTB = tmpB;
 	return state;
 }
 
 int main(void) {
-	DDRB = 0xFF; // Set port B to output
-	PORTB = 0x00; // Init port B to 0s
-	TimerSet(1000 / 8);
+	DDRA = 0X00; PORTA = 0XFF;
+	DDRB = 0xFF; PORTB = 0x00; // Init port B to 0s
+	TimerSet(SEC * 3 / 10);
 	TimerOn();
 	States state = init;
-	unsigned char tmpB = 0x00;
 	while(1) {
 		// User code (i.e. synchSM calls
 		state = TickSM(state);
 		while(!TimerFlag); //Wait 1 sec
 		TimerFlag = 0;
-		// This example just illustrates the use of the ISR and flag
 	}
 }

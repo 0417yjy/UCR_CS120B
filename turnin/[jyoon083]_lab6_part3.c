@@ -12,7 +12,7 @@
 #include "simAVRHeader.h"
 #endif
 #include <avr/interrupt.h>
-#define SEC (1000 / 8)
+#define SEC 1000
 
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clear to 0.
 
@@ -20,7 +20,7 @@ volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer
 unsigned long _avr_timer_M = 1; // Start count from here, down to 0. Default 1ms.
 unsigned long _avr_timer_cntcurr = 0; // Current internal count of 1ms ticks
 
-typedef enum States {init, wait, pressA0, pressA1, reset } States;
+typedef enum States {init, wait, pressA0, pressA1, hold_increment, hold_decrement, reset } States;
 	
 unsigned char tick_cnt = 0;
 
@@ -102,7 +102,7 @@ int pressToControlPortBValue(int state) {
 				state = reset;
 			}
 			else if(A0) { // holding the PA0 button
-				state = pressA0;
+				state = tick_cnt > 10 ? hold_increment : pressA0;
 			}
 			else if(!A0) { // releasing the PA0 button
 				state = wait;
@@ -113,11 +113,17 @@ int pressToControlPortBValue(int state) {
 				state = reset;
 			}
 			else if(A1) { // holding the PA1 button
-				state = pressA1;
+				state = tick_cnt > 10 ? hold_decrement : pressA1;
 			}
 			else if(!A1) { // releasing the PA1 button
 				state = wait;
 			}
+			break;
+		case hold_increment:
+			state = pressA0;
+			break;
+		case hold_decrement:
+			state = pressA1;
 			break;
 		case reset: // both buttons are pressed
 			// return to wait state when both buttons are released
@@ -131,18 +137,27 @@ int pressToControlPortBValue(int state) {
 		case init:
 			break;
 		case wait:
+			tick_cnt = 0;
 			break;
 		case pressA0:
-			if(PORTB < 9) {
+			if(!tick_cnt && PORTB < 9) {
 				PORTB++;
 			}
+			tick_cnt++;
 			break;
 		case pressA1:
-			if(PORTB > 0) {
+			if(!tick_cnt && PORTB > 0) {
 				PORTB--;
 			}
-		break;
-			case reset:
+			tick_cnt++;
+			break;
+		case hold_increment:
+			tick_cnt = 0;
+			break;
+		case hold_decrement:
+			tick_cnt = 0;
+			break;
+		case reset:
 			PORTB = 0; // reset PORTB to 0
 			break;
 	}

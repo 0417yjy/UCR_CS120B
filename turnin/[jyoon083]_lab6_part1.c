@@ -108,10 +108,9 @@ int TickSM(int state) {
 int main(void) {
 	DDRB = 0xFF; // Set port B to output
 	PORTB = 0x00; // Init port B to 0s
-	TimerSet(1000 / 8);
+	TimerSet(1000);
 	TimerOn();
 	States state = init;
-	unsigned char tmpB = 0x00;
 	while(1) {
 		// User code (i.e. synchSM calls
 		state = TickSM(state);
