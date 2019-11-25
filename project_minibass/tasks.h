@@ -5,6 +5,8 @@
  *  Author: Jongyeon Yoon
  */ 
 #include "declarations.h"
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct Task {
 	int state; // Task's current state
@@ -15,13 +17,16 @@ typedef struct Task {
 
 typedef enum bool {false, true} bool;
 
-#define TASK_SIZE 3
+#define TASK_SIZE 6
 Task tasks[TASK_SIZE];
 
 // shared variables
-bool mod;
+bool sv_mod = 0;
+unsigned char sv_fn = 0;
 unsigned char pressed_fret_num;
 unsigned char pressed_str_num;
+char sv_bpm_buffer[4] = "000";
+unsigned short sv_metro_bpm;
 
 /* State Machine Templates
 
@@ -53,9 +58,9 @@ int TickFct_SwitchMode (int state) {
 		break;
 		
 		case SM_hold_to_prog:
-		if(cnt > 3) {
+		if(cnt > 2) {
 			state = SM_programming_mode;
-			mod = PROG;
+			sv_mod = PROG;
 			cnt = 0;
 		}
 		else if(FRET_12 && FRET_13) {
@@ -68,7 +73,7 @@ int TickFct_SwitchMode (int state) {
 		break;
 		
 		case SM_programming_mode:
-		state = (mod == PROG) ? SM_programming_mode : SM_playing_mode;
+		state = (sv_mod == PROG) ? SM_programming_mode : SM_playing_mode;
 		break;
 		
 		default:
@@ -80,7 +85,7 @@ int TickFct_SwitchMode (int state) {
 		break;
 		
 		case SM_playing_mode:
-		mod = FP;
+		sv_mod = FP;
 		break;
 		
 		case SM_hold_to_prog:
@@ -204,11 +209,16 @@ int TickFct_ButtonInput (int state) {
 		break;
 		
 		case BI_idle:
-		if(is_str_pressed()) {
-			state = BI_playing;
-		}
-		else if(is_fret_pressed()) {
-			state = BI_fingering;
+		if(sv_mod == FP) {
+			if(is_str_pressed()) {
+				state = BI_playing;
+			}
+			else if(is_fret_pressed()) {
+				state = BI_fingering;
+			}
+			else {
+				state = BI_idle;
+			}
 		}
 		else {
 			state = BI_idle;
@@ -275,27 +285,30 @@ Pitch strings_tuning[4];
 // based on settings in PWM_on()
 // Passing in 0 as the frequency will stop the speaker from generating sound
 // set_PWM goes to tasks.h
-
 /******* PWM variables and functions start *******/
 
+#define PRESCALER 64
 void PWM_on() {
-	TCCR3A = (1 << COM3A0);
+	TCCR3A = (1 << COM3A0); // CTC mode
+	//TCCR3A = (1 << COM3A0) | (1 << WGM31) | (1 << WGM30); // Fast PWM Mode
 	// COM3A: Toggle PB3 on compare match between counter and OCR3A
-	TCCR3B = (1 << WGM32) | (1 << CS31) | (1 << CS30);
+	TCCR3B = (1 << WGM32) | (1 << CS31) | (1 << CS30); // CTC
+	//TCCR3B = (1 << WGM33) | (1 << WGM32) | (1 << CS31) | (1 << CS30); // Fast PWM mode
 	// WGM32: When counter (TCNT3) matches OCR3A, reset counter
 	// CS31 & CS30: Set a prescaler of 64
-	set_PWM(0);
+	//set_PWM(0);
 }
 void set_PWM(double frequency) {
 	static double current_frequency; // Keeps track of the currently set frequency
 	// Will only update the registers when the frequency changes, otherwise allows
 	// music to play uninterrupted.
 	if (frequency != current_frequency) {
+		//if(!frequency) {TCCR3B &= 0x00;}
 		if(!frequency) {TCCR3B &= 0x08;} // stops timer/counter
-		else { TCCR3B |= 0x03; } // resumes/continues timer/counter
+		else { TCCR3B |= 0x03; } // resumes/continues timer/counter (prescaler of 64)
 		
 		// prevents OCR3A from overflowing, using prescaler 64
-		// 0.954 is smallest frequency that will not result in overfulow
+		// 0.954 is smallest frequency that will not result in overflow
 		if(frequency < 0.954) { OCR3A = 0xFFFF; }
 		
 		// prevents OCR3A from underflowing, using prescaler 64
@@ -303,7 +316,10 @@ void set_PWM(double frequency) {
 		else if (frequency > 31250) { OCR3A = 0x0000; }
 		
 		// set OCR3A based on desired frequency
-		else { OCR3A = (short) (8000000 / (128 * frequency)) - 1; }
+		else { OCR3A = (short) (8000000 / (2 * PRESCALER * frequency)) - 1; }
+		
+		TCNT3 = 0; // resets counter
+		current_frequency = frequency; // Updates the current frequency
 	}
 }
 void PWM_off() {
@@ -313,24 +329,22 @@ void PWM_off() {
 
 /******* PWM variables and functions end *******/
 
-
 void play_note(unsigned char fret, unsigned char str) {
-	double desired_frequency;
+	unsigned short desired_frequency;
 	unsigned char tmp_letter_idx = strings_tuning[str - 1].letter_idx + fret;
 	unsigned char tmp_octave = strings_tuning[str - 1].octave;
 	
-	if(tmp_letter_idx > 11) {
+	if(tmp_letter_idx > 11) { // calculate octave and pitch
 		tmp_octave = tmp_octave + (tmp_letter_idx / 12);
 		tmp_letter_idx %= 12;
 	}
 	
-	desired_frequency = (double) tmp_octave * pitches_octave1[tmp_letter_idx];
+	// desired_frequency = (double) tmp_octave * pitches_octave1[tmp_letter_idx];
+	desired_frequency = tmp_octave * pitches_octave1[tmp_letter_idx];
 	set_PWM(desired_frequency);
 }
 void display_7segments_char(char ch) {
 	// initialize 7-segments display
-	//PORTB &= 0x40;
-	//PORTD &= 0xFE;
 	PORTB |= 0xBF;
 	PORTD |= 0x01;
 	
@@ -405,12 +419,111 @@ void display_7segments_char(char ch) {
 		SEVEN_D_ON();
 		SEVEN_E_ON();
 		SEVEN_F_ON();
+		SEVEN_DOT_ON();
+		break;
+		
+		case 'P':
+		// turn on abefg
+		SEVEN_A_ON();
+		SEVEN_B_ON();
+		SEVEN_E_ON();
+		SEVEN_F_ON();
+		SEVEN_G_ON();
 		break;
 		
 		case 't':
 		// turn on defg
 		SEVEN_D_ON();
 		SEVEN_E_ON();
+		SEVEN_F_ON();
+		SEVEN_G_ON();
+		break;
+		
+		case '0':
+		// turn on abcdef
+		SEVEN_A_ON();
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
+		SEVEN_E_ON();
+		SEVEN_F_ON();
+		break;
+		
+		case '1':
+		// turn on bc
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		break;
+		
+		case '2':
+		// turn on abdeg
+		SEVEN_A_ON();
+		SEVEN_B_ON();
+		SEVEN_D_ON();
+		SEVEN_E_ON();
+		SEVEN_G_ON();
+		break;
+		
+		case '3':
+		// turn on abcdg
+		SEVEN_A_ON();
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
+		SEVEN_G_ON();
+		break;
+		
+		case '4':
+		// turn on bcfg
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		SEVEN_F_ON();
+		SEVEN_G_ON();
+		break;
+		
+		case '5':
+		// turn on acdfg
+		SEVEN_A_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
+		SEVEN_F_ON();
+		SEVEN_G_ON();
+		break;
+		
+		case '6':
+		// turn on acdefg
+		SEVEN_A_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
+		SEVEN_E_ON();
+		SEVEN_F_ON();
+		SEVEN_G_ON();
+		break;
+		
+		case '7':
+		// turn on abc
+		SEVEN_A_ON();
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		break;
+		
+		case '8':
+		// turn on abcdefg
+		SEVEN_A_ON();
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
+		SEVEN_E_ON();
+		SEVEN_F_ON();
+		SEVEN_G_ON();
+		break;
+		
+		case '9':
+		// turn on abcdfg
+		SEVEN_A_ON();
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
 		SEVEN_F_ON();
 		SEVEN_G_ON();
 		break;
@@ -510,15 +623,245 @@ int TickFct_DisplayAndPlay (int state) {
 		break;
 		
 		case DAP_idle:
-		display_7segments_char(0);
-		SHARP_LED_OFF();
-		PWM_off();
+		if(sv_mod == FP) {
+			display_7segments_char(0);
+			SHARP_LED_OFF();
+			PWM_off();
+		}
+		//set_PWM(0);
 		break;
 		
 		case DAP_play:
 		PWM_on();
 		display_7segments_LED_pitch(pressed_fret_num, pressed_str_num);
 		play_note(pressed_fret_num, pressed_str_num);
+		break;
+	}
+	return state;
+};
+
+enum SelectFunctionStates { SF_init, SF_disabled, SF_select_fn};
+int TickFct_SelectFunction (int state) {
+	switch(state) { // Transitions
+		case SF_init:
+		state = SF_disabled;
+		break;
+		
+		case SF_disabled:
+		if(sv_mod == FP) {
+			state = SF_disabled;
+		}
+		else if(sv_mod == PROG) {
+			state = SF_select_fn;
+		}
+		break;
+		
+		case SF_select_fn:
+		if(FRET_15) {
+			state = SF_select_fn;
+			sv_fn = FN_TUNING;
+		}
+		else if(FRET_14) {
+			state = SF_select_fn;
+			sv_fn = FN_METRO;
+		}
+		else if(sv_fn == FN_NOTSELECTED && FRET_11) {
+			state = SF_disabled;
+			sv_mod = FP;
+		}
+		else {
+			state = SF_select_fn;
+		}
+		break;
+		
+		default:
+		state = SF_init;
+		break;
+	}
+	
+	switch(state) { // Actions
+		case SF_init:
+		break;
+		
+		case SF_disabled:
+		break;
+		
+		case SF_select_fn:
+		switch(sv_fn) {
+			case FN_NOTSELECTED:
+			display_7segments_char('P');
+			break;
+			
+			case FN_METRO:
+			display_7segments_char('O');
+			break;
+			
+			case FN_TUNING:
+			display_7segments_char('t');
+			break;
+			
+			default:
+			break;
+		}
+		break;
+	}
+	return state;
+};
+
+void insert_bpm_buffer(unsigned char input) {
+	if(input >= 0 && input <= 9) {
+		sv_bpm_buffer[0] = sv_bpm_buffer[1]; // shift buffer to left once
+		sv_bpm_buffer[1] = sv_bpm_buffer[2];
+		sv_bpm_buffer[2] = '0' + input;
+	}
+}
+enum metrOnomeStates { M_init, M_wait, M_user_input, M_user_input_pressed, M_save_bpm };
+int TickFct_metrOnome (int state) {
+	static unsigned char input = '0';
+	static bool is_input_triggered = false;
+	
+	switch(state) { // Transitions
+		case M_init:
+		state = M_wait;
+		break;
+		
+		case M_wait:
+		if(sv_fn == FN_METRO) {
+			state = M_user_input;
+		}
+		else {
+			state = M_wait;
+		}
+		break;
+		
+		case M_user_input:
+		if(is_fret_pressed()) {
+			if(FRET_11) {
+				// save inserted bpm
+				state = M_save_bpm;
+			}
+			else if(FRET_15) {
+				// change to tuning mode
+				state = M_wait;
+			}
+			else if(FRET_14) {
+				// re-enter metronome mode: initialize buffer
+				strcpy(sv_bpm_buffer, "000");
+				is_input_triggered = false;
+				state = M_user_input;
+			}
+			else if(FRET_12 || FRET_13 || FRET_16 || FRET_17) {
+				// invalid inputs: do nothing
+				state = M_user_input;
+			}
+			else {
+				// FRET1 ~ FRET10 pressed
+				is_input_triggered = true;
+				state = M_user_input_pressed;
+				input = get_fret_num();
+				if(input == 10) {
+					input = 0;
+				}
+				insert_bpm_buffer(input);
+				input += '0';
+			}
+		}
+		else if(sv_fn != FN_METRO) {
+			state = M_wait;
+		}
+		else {
+			state = M_user_input;
+		}
+		break;
+		
+		case M_user_input_pressed:
+		state = is_fret_pressed() ? M_user_input_pressed : M_user_input;
+		break;
+		
+		case M_save_bpm:
+		if(FRET_11) { // holding
+			state = M_save_bpm;
+		}
+		else { // releasing
+			state = M_wait;
+			
+			// initialize flag and buffer
+			is_input_triggered = false;
+			strcpy(sv_bpm_buffer, "000");
+			
+			// exit metronome mode
+			sv_fn = FN_NOTSELECTED;
+		}
+		break;
+		
+		default:
+		state = M_init;
+		break;
+	}
+	
+	switch(state) { // Actions
+		case M_init:
+		break;
+		
+		case M_wait:
+		break;
+		
+		case M_user_input:
+		if(is_input_triggered) {
+			display_7segments_char(input);
+		}
+		break;
+		
+		case M_user_input_pressed:
+		display_7segments_char(input);
+		break;
+		
+		case M_save_bpm:
+		display_7segments_char(input);
+		sv_metro_bpm = (short) atoi(sv_bpm_buffer);
+		if(sv_metro_bpm > 0) {
+			tasks[5].period = (long) (1000 / ((float) sv_metro_bpm / 60)); // change period of BlinkLED SM
+		}
+		break;
+	}
+	return state;
+};
+
+enum BlinkLEDStates { BL_init, BL_led_off, BL_led_on};
+int TickFct_BlinkLED (int state) {
+	switch(state) { // Transitions
+		case BL_init:
+		state = BL_led_off;
+		break;
+		
+		case BL_led_off:
+		if(sv_metro_bpm > 0) {
+			state = BL_led_on;
+		}
+		else {
+			state = BL_led_off;
+		}
+		break;
+		
+		case BL_led_on:
+		state = BL_led_off;
+		break;
+		
+		default:
+		state = BL_init;
+		break;
+	}
+	
+	switch(state) { // Actions
+		case BL_init:
+		break;
+		
+		case BL_led_off:
+		METRO_LED_OFF();
+		break;
+		
+		case BL_led_on:
+		METRO_LED_ON();
 		break;
 	}
 	return state;

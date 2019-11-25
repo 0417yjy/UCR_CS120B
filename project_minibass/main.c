@@ -11,6 +11,7 @@
 #endif
 #include <avr/interrupt.h>
 #include "tasks.h"
+#define SYSTEM_PERIOD 2
 
 /******* Timer variables and functions start *******/ 
 volatile unsigned char TimerFlag = 0; // TimerISR() sets this to 1. C programmer should clear to 0.
@@ -56,7 +57,7 @@ void TimerISR() {
 			tasks[i].state = tasks[i].TickFct(tasks[i].state);
 			tasks[i].elapsedTime = 0;
 		}
-		tasks[i].elapsedTime += 1;
+		tasks[i].elapsedTime += SYSTEM_PERIOD;
 	}
 }
 
@@ -82,6 +83,7 @@ int main(void) {
 	DDRC = 0x00; PORTC = 0xFF; // set PORTC as inputs (C0..7 are fret 6..13)
 	DDRD = 0x07; PORTD = 0xF8; // D0..2 are outputs, D3..7 are inputs as fret 1..5
 	
+	// initialize tuning arrays
 	unsigned char i = 0;
 	strings_tuning[i].octave = 1;
 	strings_tuning[i].letter_idx = 4;
@@ -97,23 +99,38 @@ int main(void) {
 	i = 0;
 	
 	tasks[i].state = SM_init;
-	tasks[i].period = 1000;
+	tasks[i].period = 500;
 	tasks[i].elapsedTime = tasks[i].period;
 	tasks[i].TickFct = &TickFct_SwitchMode;
 	i++;
 	tasks[i].state = BI_init;
-	tasks[i].period = 1;
+	tasks[i].period = 2;
 	tasks[i].elapsedTime = tasks[i].period;
 	tasks[i].TickFct = &TickFct_ButtonInput;
 	i++;
 	tasks[i].state = DAP_init;
-	tasks[i].period = 1;
+	tasks[i].period = 2;
 	tasks[i].elapsedTime = tasks[i].period;
 	tasks[i].TickFct = &TickFct_DisplayAndPlay;
 	i++;
+	tasks[i].state = SF_init;
+	tasks[i].period = 50;
+	tasks[i].elapsedTime = tasks[i].period;
+	tasks[i].TickFct = &TickFct_SelectFunction;
+	i++;
+	tasks[i].state = M_init;
+	tasks[i].period = 50;
+	tasks[i].elapsedTime = tasks[i].period;
+	tasks[i].TickFct = &TickFct_metrOnome;
+	i++;
+	tasks[i].state = BL_init;
+	tasks[i].period = SYSTEM_PERIOD;
+	tasks[i].elapsedTime = tasks[i].period;
+	tasks[i].TickFct = &TickFct_BlinkLED;
+	i++;
 	
 	PWM_on();
-	TimerSet(1);
+	TimerSet(SYSTEM_PERIOD);
 	TimerOn();
 	
 	while(1) { }

@@ -12,6 +12,10 @@
 #define FP 0
 #define PROG 1
 
+#define FN_NOTSELECTED 0
+#define FN_METRO 1
+#define FN_TUNING 2
+
 #define STR_1 (~PINA & 0x01)
 #define STR_2 (~PINA & 0x02)
 #define STR_3 (~PINA & 0x04)
@@ -47,6 +51,19 @@
 #define PITCH_A1 55.00
 #define PITCH_AS1 58.27
 #define PITCH_B1 61.74
+
+/*#define PITCH_C1 33
+#define PITCH_CS1 35
+#define PITCH_D1 37
+#define PITCH_DS1 38
+#define PITCH_E1 41
+#define PITCH_F1 44
+#define PITCH_FS1 46
+#define PITCH_G1 49
+#define PITCH_GS1 52
+#define PITCH_A1 55
+#define PITCH_AS1 58
+#define PITCH_B1 62*/
 
 #define METRO_LED_ON() (PORTD = PORTD | 0x04)
 #define METRO_LED_OFF() (PORTD = PORTD & 0xFB)
