@@ -7,6 +7,7 @@
 #include "declarations.h"
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 typedef struct Task {
 	int state; // Task's current state
@@ -17,7 +18,7 @@ typedef struct Task {
 
 typedef enum bool {false, true} bool;
 
-#define TASK_SIZE 6
+#define TASK_SIZE 7
 Task tasks[TASK_SIZE];
 
 // shared variables
@@ -330,7 +331,7 @@ void PWM_off() {
 /******* PWM variables and functions end *******/
 
 void play_note(unsigned char fret, unsigned char str) {
-	unsigned short desired_frequency;
+	double desired_frequency;
 	unsigned char tmp_letter_idx = strings_tuning[str - 1].letter_idx + fret;
 	unsigned char tmp_octave = strings_tuning[str - 1].octave;
 	
@@ -340,7 +341,7 @@ void play_note(unsigned char fret, unsigned char str) {
 	}
 	
 	// desired_frequency = (double) tmp_octave * pitches_octave1[tmp_letter_idx];
-	desired_frequency = tmp_octave * pitches_octave1[tmp_letter_idx];
+	desired_frequency = pow(2, tmp_octave) * pitches_octave1[tmp_letter_idx];
 	set_PWM(desired_frequency);
 }
 void display_7segments_char(char ch) {
@@ -687,6 +688,7 @@ int TickFct_SelectFunction (int state) {
 		break;
 		
 		case SF_select_fn:
+		SHARP_LED_OFF();
 		switch(sv_fn) {
 			case FN_NOTSELECTED:
 			display_7segments_char('P');
@@ -862,6 +864,162 @@ int TickFct_BlinkLED (int state) {
 		
 		case BL_led_on:
 		METRO_LED_ON();
+		break;
+	}
+	return state;
+};
+
+void increment_tuning(unsigned char str) {
+	if(strings_tuning[str - 1].letter_idx < 11) {
+		strings_tuning[str - 1].letter_idx++;
+	}
+	else {
+		strings_tuning[str - 1].letter_idx = 0;
+		strings_tuning[str - 1].octave++;
+	}
+}
+void decrement_tuning(unsigned char str) {
+	if(strings_tuning[str - 1].letter_idx > 0) {
+		strings_tuning[str - 1].letter_idx--;
+	}
+	else {
+		if(strings_tuning[str - 1].octave > 0) {
+			strings_tuning[str - 1].letter_idx = 11;
+			strings_tuning[str - 1].octave--;
+		}
+	}
+}
+void reset_tuning(unsigned char str) {
+	switch (str) {
+		case 1:
+		strings_tuning[0].octave = 0;
+		strings_tuning[0].letter_idx = 4;
+		break;
+		
+		case 2:
+		strings_tuning[1].octave = 0;
+		strings_tuning[1].letter_idx = 9;
+		break;
+		
+		case 3:
+		strings_tuning[1].octave = 1;
+		strings_tuning[1].letter_idx = 2;
+		break;
+		
+		case 4:
+		strings_tuning[1].octave = 1;
+		strings_tuning[1].letter_idx = 7;
+		break;
+		
+		default:
+		break;
+	}
+}
+enum TuningStates { T_init, T_wait, T_select_str, T_reset_tune, T_adjust_tune, T_save_quit };
+int TickFct_Tuning (int state) {
+	static unsigned char selected_str = 0;
+	static bool is_input_triggered = false;
+	
+	switch(state) { // Transitions
+		case T_init:
+		state = T_wait;
+		break;
+		
+		case T_wait:
+		state = (sv_fn == FN_TUNING) ? T_select_str : T_wait;
+		break;
+		
+		case T_select_str:
+		if(sv_fn != FN_TUNING) {
+			state = T_wait;
+		}
+		else if(is_str_pressed()) {
+			state = T_select_str;
+			selected_str = get_str_num(selected_str);
+			is_input_triggered = true;
+		}
+		else if(FRET_11) {
+			state = T_save_quit;
+		}
+		else if(is_input_triggered && FRET_12 && FRET_13) {
+			state = T_reset_tune;
+		}
+		else if(is_input_triggered && (FRET_12 || FRET_13)) {
+			state = T_adjust_tune;
+			if(FRET_12) {
+				increment_tuning(selected_str);
+			}
+			else if(FRET_13) {
+				decrement_tuning(selected_str);
+			}
+		}
+		else {
+			state = T_select_str;
+		}
+		break;
+		
+		case T_reset_tune:
+		if(!FRET_12 && !FRET_13) {
+			state = selected_str;
+		}
+		else {
+			state = T_reset_tune;
+		}
+		break;
+		
+		case T_adjust_tune:
+		if(FRET_12 && FRET_13) {
+			state = T_reset_tune;
+		}
+		else if(!FRET_12 && !FRET_13) {
+			state = T_select_str;
+		}
+		else if(FRET_12 || FRET_13) {
+			state = T_adjust_tune;
+		}
+		break;
+		
+		case T_save_quit:
+		if(FRET_11) { // holding
+			state = T_save_quit;
+		}
+		else { // releasing
+			state = T_wait;
+			selected_str = 0;
+			sv_fn = FN_NOTSELECTED;
+			is_input_triggered = false;
+		}
+		break;
+		
+		default:
+		state = T_init;
+		break;
+	}
+	
+	switch(state) { // Actions
+		case T_init:
+		break;
+		
+		case T_wait:
+		break;
+		
+		case T_select_str:
+		if(is_input_triggered) {
+			display_7segments_LED_pitch(0, selected_str);
+		}
+		break;
+		
+		case T_reset_tune:
+		reset_tuning(selected_str);
+		display_7segments_LED_pitch(0, selected_str);
+		break;
+		
+		case T_adjust_tune:
+		display_7segments_LED_pitch(0, selected_str);
+		break;
+		
+		case T_save_quit:
+		display_7segments_LED_pitch(0, selected_str);
 		break;
 	}
 	return state;

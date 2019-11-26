@@ -85,16 +85,16 @@ int main(void) {
 	
 	// initialize tuning arrays
 	unsigned char i = 0;
-	strings_tuning[i].octave = 1;
+	strings_tuning[i].octave = 0;
 	strings_tuning[i].letter_idx = 4;
 	i++;
-	strings_tuning[i].octave = 1;
+	strings_tuning[i].octave = 0;
 	strings_tuning[i].letter_idx = 9;
 	i++;
-	strings_tuning[i].octave = 2;
+	strings_tuning[i].octave = 1;
 	strings_tuning[i].letter_idx = 2;
 	i++;
-	strings_tuning[i].octave = 2;
+	strings_tuning[i].octave = 1;
 	strings_tuning[i].letter_idx = 7;
 	i = 0;
 	
@@ -127,6 +127,11 @@ int main(void) {
 	tasks[i].period = SYSTEM_PERIOD;
 	tasks[i].elapsedTime = tasks[i].period;
 	tasks[i].TickFct = &TickFct_BlinkLED;
+	i++;
+	tasks[i].state = T_init;
+	tasks[i].period = 50;
+	tasks[i].elapsedTime = tasks[i].period;
+	tasks[i].TickFct = &TickFct_Tuning;
 	i++;
 	
 	PWM_on();
