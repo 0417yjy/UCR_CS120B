@@ -10,6 +10,7 @@
 #include "simAVRHeader.h"
 #endif
 #include <avr/interrupt.h>
+#include <avr/eeprom.h>
 #include "tasks.h"
 #include <stdlib.h>
 #define SYSTEM_PERIOD 2
@@ -78,6 +79,29 @@ void TimerSet(unsigned long M) {
 }
 /******* Timer variables and functions end *******/
 
+void initialize_EEPROM() {
+	Saving_Slot tmp_eeslots[9];
+	unsigned char i, j;
+	for(i=0;i<9;i++) {
+		// default settings: octave = 0, E standard tuning
+		j=0;
+		tmp_eeslots[i].global_octave = 0;
+		tmp_eeslots[i].strings_tuning[j].octave = 0;
+		tmp_eeslots[i].strings_tuning[j].letter_idx = 4;
+		j++;
+		tmp_eeslots[i].strings_tuning[j].octave = 0;
+		tmp_eeslots[i].strings_tuning[j].letter_idx = 9;
+		j++;
+		tmp_eeslots[i].strings_tuning[j].octave = 1;
+		tmp_eeslots[i].strings_tuning[j].letter_idx = 2;
+		j++;
+		tmp_eeslots[i].strings_tuning[j].octave = 1;
+		tmp_eeslots[i].strings_tuning[j].letter_idx = 7;
+	}
+	
+	eeprom_update_block((const void*)&tmp_eeslots, (void*)&sv_slots, sizeof(Saving_Slot) * 9 /* 9x9 = 81*/);
+}
+
 int main(void) {
 	unsigned char i; // used in for loop
 	DDRA = 0x00; PORTA = 0xFF; // set PORTA as inputs (A0..3 are strings, A4..7 are fret 14, 15, 16, 17)
@@ -85,35 +109,27 @@ int main(void) {
 	DDRC = 0x00; PORTC = 0xFF; // set PORTC as inputs (C0..7 are fret 6..13)
 	DDRD = 0x07; PORTD = 0xF8; // D0..2 are outputs, D3..7 are inputs as fret 1..5
 	
-	// dynamic allocate save slots
-	sv_slots = (Pitch**) malloc(sizeof(Pitch*) * 9);
-	if(sv_slots == NULL) {
-		return 1;
-	}
+	//initialize EEPROM
+	//initialize_EEPROM();
 	
-	for(i=0; i<9; i++) {
-		sv_slots[i] = (Pitch*) malloc(sizeof(Pitch) * 4);
-		if(sv_slots[i] == NULL) {
-			return 1;
-		}
-	}
-	// read EEPROM and copy to the sv_slots
+	// initialize tuning arrays (load from save slot 1)
+	eeprom_read_block((void*)&current_settings, (const void*)&sv_slots, sizeof(Saving_Slot) * 9);
 	
-	// initialize tuning arrays
+	/* i = 0;
+	current_settings.strings_tuning[i].octave = 0;
+	current_settings.strings_tuning[i].letter_idx = 4;
+	i++;
+	current_settings.strings_tuning[i].octave = 0;
+	current_settings.strings_tuning[i].letter_idx = 9;
+	i++;
+	current_settings.strings_tuning[i].octave = 1;
+	current_settings.strings_tuning[i].letter_idx = 2;
+	i++;
+	current_settings.strings_tuning[i].octave = 1;
+	current_settings.strings_tuning[i].letter_idx = 7; */
+	
+	
 	i = 0;
-	strings_tuning[i].octave = 0;
-	strings_tuning[i].letter_idx = 4;
-	i++;
-	strings_tuning[i].octave = 0;
-	strings_tuning[i].letter_idx = 9;
-	i++;
-	strings_tuning[i].octave = 1;
-	strings_tuning[i].letter_idx = 2;
-	i++;
-	strings_tuning[i].octave = 1;
-	strings_tuning[i].letter_idx = 7;
-	i = 0;
-	
 	tasks[i].state = SM_init;
 	tasks[i].period = 500;
 	tasks[i].elapsedTime = tasks[i].period;

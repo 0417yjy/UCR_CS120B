@@ -5,6 +5,7 @@
  *  Author: Jongyeon Yoon
  */ 
 #include "declarations.h"
+#include <avr/eeprom.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -23,11 +24,15 @@ typedef struct Pitch {
 	unsigned char letter_idx;
 } Pitch;
 
+typedef struct Saving_Slot {
+	unsigned char global_octave;
+	Pitch strings_tuning[4];
+} Saving_Slot;
+
 #define TASK_SIZE 9
 Task tasks[TASK_SIZE];
 
 const float pitches_octave1[12] = { PITCH_C1, PITCH_CS1, PITCH_D1, PITCH_DS1, PITCH_E1, PITCH_F1, PITCH_FS1, PITCH_G1, PITCH_GS1, PITCH_A1, PITCH_AS1, PITCH_B1 };
-Pitch strings_tuning[4];
 // shared variables
 bool sv_mod = 0;
 unsigned char sv_fn = 0;
@@ -35,8 +40,9 @@ unsigned char pressed_fret_num;
 unsigned char pressed_str_num;
 char sv_bpm_buffer[4] = "000";
 unsigned short sv_metro_bpm;
-Pitch **sv_slots;
 unsigned char sv_global_octave;
+Saving_Slot EEMEM sv_slots[9];
+Saving_Slot current_settings;
 
 /* State Machine Templates
 
@@ -337,8 +343,8 @@ void PWM_off() {
 
 void play_note(unsigned char fret, unsigned char str) {
 	double desired_frequency;
-	unsigned char tmp_letter_idx = strings_tuning[str - 1].letter_idx + fret;
-	unsigned char tmp_octave = strings_tuning[str - 1].octave;
+	unsigned char tmp_letter_idx = current_settings.strings_tuning[str - 1].letter_idx + fret;
+	unsigned char tmp_octave = current_settings.strings_tuning[str - 1].octave;
 	
 	if(tmp_letter_idx > 11) { // calculate octave and pitch
 		tmp_octave = tmp_octave + (tmp_letter_idx / 12);
@@ -563,7 +569,7 @@ void display_7segments_char(char ch) {
 	}
 }
 void display_7segments_LED_pitch(unsigned char fret, unsigned char str) {
-	unsigned char tmp_letter_idx = strings_tuning[str - 1].letter_idx + fret;
+	unsigned char tmp_letter_idx = current_settings.strings_tuning[str - 1].letter_idx + fret;
 	if(tmp_letter_idx > 11) {
 		tmp_letter_idx %= 12;
 	}
@@ -697,11 +703,11 @@ int TickFct_SelectFunction (int state) {
 			state = SF_select_fn;
 			sv_fn = FN_OCTAVE;
 		}
-		else if(sv_fn == FN_NOTSELECTED && FRET_12) {
+		else if(sv_fn != FN_TUNING && sv_fn != FN_OCTAVE && FRET_12) {
 			state = SF_select_fn;
 			sv_fn = FN_LOAD;
 		}
-		else if(sv_fn == FN_NOTSELECTED && FRET_13) {
+		else if(sv_fn != FN_TUNING && sv_fn != FN_OCTAVE && FRET_13) {
 			state = SF_select_fn;
 			sv_fn = FN_SAVE;
 		}
@@ -921,45 +927,45 @@ int TickFct_BlinkLED (int state) {
 };
 
 void increment_tuning(unsigned char str) {
-	if(strings_tuning[str - 1].letter_idx < 11) {
-		strings_tuning[str - 1].letter_idx++;
+	if(current_settings.strings_tuning[str - 1].letter_idx < 11) {
+		current_settings.strings_tuning[str - 1].letter_idx++;
 	}
 	else {
-		strings_tuning[str - 1].letter_idx = 0;
-		strings_tuning[str - 1].octave++;
+		current_settings.strings_tuning[str - 1].letter_idx = 0;
+		current_settings.strings_tuning[str - 1].octave++;
 	}
 }
 void decrement_tuning(unsigned char str) {
-	if(strings_tuning[str - 1].letter_idx > 0) {
-		strings_tuning[str - 1].letter_idx--;
+	if(current_settings.strings_tuning[str - 1].letter_idx > 0) {
+		current_settings.strings_tuning[str - 1].letter_idx--;
 	}
 	else {
-		if(strings_tuning[str - 1].octave > 0) {
-			strings_tuning[str - 1].letter_idx = 11;
-			strings_tuning[str - 1].octave--;
+		if(current_settings.strings_tuning[str - 1].octave > 0) {
+			current_settings.strings_tuning[str - 1].letter_idx = 11;
+			current_settings.strings_tuning[str - 1].octave--;
 		}
 	}
 }
 void reset_tuning(unsigned char str) {
 	switch (str) {
 		case 1:
-		strings_tuning[0].octave = 0;
-		strings_tuning[0].letter_idx = 4;
+		current_settings.strings_tuning[0].octave = 0;
+		current_settings.strings_tuning[0].letter_idx = 4;
 		break;
 		
 		case 2:
-		strings_tuning[1].octave = 0;
-		strings_tuning[1].letter_idx = 9;
+		current_settings.strings_tuning[1].octave = 0;
+		current_settings.strings_tuning[1].letter_idx = 9;
 		break;
 		
 		case 3:
-		strings_tuning[1].octave = 1;
-		strings_tuning[1].letter_idx = 2;
+		current_settings.strings_tuning[1].octave = 1;
+		current_settings.strings_tuning[1].letter_idx = 2;
 		break;
 		
 		case 4:
-		strings_tuning[1].octave = 1;
-		strings_tuning[1].letter_idx = 7;
+		current_settings.strings_tuning[1].octave = 1;
+		current_settings.strings_tuning[1].letter_idx = 7;
 		break;
 		
 		default:
@@ -1077,10 +1083,10 @@ int TickFct_Tuning (int state) {
 };
 
 void save_state(unsigned char slot) {
-	// should implement it
+	eeprom_update_block((const void*)&current_settings, (void*)(&sv_slots + (sizeof(Saving_Slot) * (slot - 1))), sizeof(Saving_Slot));
 }
 void load_state(unsigned char slot) {
-	// should implement it
+	eeprom_read_block((void*)&current_settings, (const void*)(&sv_slots + (sizeof(Saving_Slot) * (slot - 1))), sizeof(Saving_Slot));
 }
 enum SaveOrLoadStates {SOL_init, SOL_wait, SOL_select_slot, SOL_confirm_operation };
 int TickFct_SaveOrLoad (int state) {
@@ -1115,6 +1121,13 @@ int TickFct_SaveOrLoad (int state) {
 		else if(FRET_11 && is_input_triggered) {
 			state = SOL_confirm_operation;
 		}
+		else if(FRET_11 && !is_input_triggered) {
+			state = SOL_wait;
+			is_input_triggered = false;
+			selected_slot = 0;
+			current_fn = FN_NOTSELECTED;
+			sv_fn = FN_NOTSELECTED;
+		}
 		else {
 			state = SOL_select_slot;
 		}
@@ -1134,6 +1147,7 @@ int TickFct_SaveOrLoad (int state) {
 			is_input_triggered = false;
 			selected_slot = 0;
 			current_fn = FN_NOTSELECTED;
+			sv_fn = FN_NOTSELECTED;
 		}
 		break;
 		
