@@ -17,10 +17,17 @@ typedef struct Task {
 } Task;
 
 typedef enum bool {false, true} bool;
+	
+typedef struct Pitch {
+	unsigned char octave;
+	unsigned char letter_idx;
+} Pitch;
 
-#define TASK_SIZE 7
+#define TASK_SIZE 9
 Task tasks[TASK_SIZE];
 
+const float pitches_octave1[12] = { PITCH_C1, PITCH_CS1, PITCH_D1, PITCH_DS1, PITCH_E1, PITCH_F1, PITCH_FS1, PITCH_G1, PITCH_GS1, PITCH_A1, PITCH_AS1, PITCH_B1 };
+Pitch strings_tuning[4];
 // shared variables
 bool sv_mod = 0;
 unsigned char sv_fn = 0;
@@ -28,6 +35,8 @@ unsigned char pressed_fret_num;
 unsigned char pressed_str_num;
 char sv_bpm_buffer[4] = "000";
 unsigned short sv_metro_bpm;
+Pitch **sv_slots;
+unsigned char sv_global_octave;
 
 /* State Machine Templates
 
@@ -61,7 +70,6 @@ int TickFct_SwitchMode (int state) {
 		case SM_hold_to_prog:
 		if(cnt > 2) {
 			state = SM_programming_mode;
-			sv_mod = PROG;
 			cnt = 0;
 		}
 		else if(FRET_12 && FRET_13) {
@@ -94,6 +102,8 @@ int TickFct_SwitchMode (int state) {
 		break;
 		
 		case SM_programming_mode:
+		display_7segments_char('P');
+		sv_mod = PROG;
 		break;
 	}
 	
@@ -276,12 +286,7 @@ int TickFct_ButtonInput (int state) {
 	return state;
 }
 
-typedef struct Pitch {
-	unsigned char octave;
-	unsigned char letter_idx;
-	} Pitch;
-const float pitches_octave1[12] = { PITCH_C1, PITCH_CS1, PITCH_D1, PITCH_DS1, PITCH_E1, PITCH_F1, PITCH_FS1, PITCH_G1, PITCH_GS1, PITCH_A1, PITCH_AS1, PITCH_B1 };
-Pitch strings_tuning[4];
+
 // 0.954 hz is lowest frequency possible with this function,
 // based on settings in PWM_on()
 // Passing in 0 as the frequency will stop the speaker from generating sound
@@ -341,7 +346,7 @@ void play_note(unsigned char fret, unsigned char str) {
 	}
 	
 	// desired_frequency = (double) tmp_octave * pitches_octave1[tmp_letter_idx];
-	desired_frequency = pow(2, tmp_octave) * pitches_octave1[tmp_letter_idx];
+	desired_frequency = pow(2, tmp_octave + sv_global_octave) * pitches_octave1[tmp_letter_idx];
 	set_PWM(desired_frequency);
 }
 void display_7segments_char(char ch) {
@@ -412,6 +417,20 @@ void display_7segments_char(char ch) {
 		SEVEN_F_ON();
 		break;
 		
+		case 'L':
+		// turn on def
+		SEVEN_D_ON();
+		SEVEN_E_ON();
+		SEVEN_F_ON();
+		break;
+		
+		case 'M':
+		// turn on ace
+		SEVEN_A_ON();
+		SEVEN_C_ON();
+		SEVEN_E_ON();
+		break;
+		
 		case 'O':
 		// turn on abcdef
 		SEVEN_A_ON();
@@ -430,6 +449,16 @@ void display_7segments_char(char ch) {
 		SEVEN_E_ON();
 		SEVEN_F_ON();
 		SEVEN_G_ON();
+		break;
+		
+		case 'S':
+		// turn on acdfg / dot
+		SEVEN_A_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
+		SEVEN_F_ON();
+		SEVEN_G_ON();
+		SEVEN_DOT_ON();
 		break;
 		
 		case 't':
@@ -596,7 +625,6 @@ void display_7segments_LED_pitch(unsigned char fret, unsigned char str) {
 		display_7segments_char('b');
 		break;
 		
-		default:
 		break;
 	}
 }
@@ -608,11 +636,11 @@ int TickFct_DisplayAndPlay (int state) {
 		break;
 		
 		case DAP_idle:
-		state = pressed_str_num > 0 ? DAP_play : DAP_idle;
+		state = (pressed_str_num > 0) && sv_mod == FP ? DAP_play : DAP_idle;
 		break;
 		
 		case DAP_play:
-		state = pressed_str_num > 0 ? DAP_play : DAP_idle;
+		state = (pressed_str_num > 0) && sv_mod == FP ? DAP_play : DAP_idle;
 		break;
 		
 		default:
@@ -627,9 +655,8 @@ int TickFct_DisplayAndPlay (int state) {
 		if(sv_mod == FP) {
 			display_7segments_char(0);
 			SHARP_LED_OFF();
-			PWM_off();
 		}
-		//set_PWM(0);
+		PWM_off();
 		break;
 		
 		case DAP_play:
@@ -652,7 +679,7 @@ int TickFct_SelectFunction (int state) {
 		if(sv_mod == FP) {
 			state = SF_disabled;
 		}
-		else if(sv_mod == PROG) {
+		else if(sv_mod == PROG && !is_fret_pressed()) {
 			state = SF_select_fn;
 		}
 		break;
@@ -665,6 +692,18 @@ int TickFct_SelectFunction (int state) {
 		else if(FRET_14) {
 			state = SF_select_fn;
 			sv_fn = FN_METRO;
+		}
+		else if(FRET_16) {
+			state = SF_select_fn;
+			sv_fn = FN_OCTAVE;
+		}
+		else if(sv_fn == FN_NOTSELECTED && FRET_12) {
+			state = SF_select_fn;
+			sv_fn = FN_LOAD;
+		}
+		else if(sv_fn == FN_NOTSELECTED && FRET_13) {
+			state = SF_select_fn;
+			sv_fn = FN_SAVE;
 		}
 		else if(sv_fn == FN_NOTSELECTED && FRET_11) {
 			state = SF_disabled;
@@ -695,11 +734,23 @@ int TickFct_SelectFunction (int state) {
 			break;
 			
 			case FN_METRO:
-			display_7segments_char('O');
+			display_7segments_char('M');
 			break;
 			
 			case FN_TUNING:
 			display_7segments_char('t');
+			break;
+			
+			case FN_OCTAVE:
+			display_7segments_char('O');
+			break;
+			
+			case FN_LOAD:
+			display_7segments_char('L');
+			break;
+			
+			case FN_SAVE:
+			display_7segments_char('S');
 			break;
 			
 			default:
@@ -717,8 +768,8 @@ void insert_bpm_buffer(unsigned char input) {
 		sv_bpm_buffer[2] = '0' + input;
 	}
 }
-enum metrOnomeStates { M_init, M_wait, M_user_input, M_user_input_pressed, M_save_bpm };
-int TickFct_metrOnome (int state) {
+enum MetronomeStates { M_init, M_wait, M_user_input, M_user_input_pressed, M_save_bpm };
+int TickFct_Metronome (int state) {
 	static unsigned char input = '0';
 	static bool is_input_triggered = false;
 	
@@ -960,7 +1011,7 @@ int TickFct_Tuning (int state) {
 		
 		case T_reset_tune:
 		if(!FRET_12 && !FRET_13) {
-			state = selected_str;
+			state = T_select_str;
 		}
 		else {
 			state = T_reset_tune;
@@ -1020,6 +1071,222 @@ int TickFct_Tuning (int state) {
 		
 		case T_save_quit:
 		display_7segments_LED_pitch(0, selected_str);
+		break;
+	}
+	return state;
+};
+
+void save_state(unsigned char slot) {
+	// should implement it
+}
+void load_state(unsigned char slot) {
+	// should implement it
+}
+enum SaveOrLoadStates {SOL_init, SOL_wait, SOL_select_slot, SOL_confirm_operation };
+int TickFct_SaveOrLoad (int state) {
+	static unsigned char current_fn = FN_NOTSELECTED;
+	static bool is_input_triggered = false;
+	static unsigned char selected_slot = 0;
+	
+	switch(state) { // Transitions
+		case SOL_init:
+		state = SOL_wait;
+		break;
+		
+		case SOL_wait:
+		if((sv_fn == FN_SAVE) | (sv_fn == FN_LOAD)) {
+			state = SOL_select_slot;
+			current_fn = sv_fn;
+		}
+		else {
+			state = SOL_wait;
+		}
+		break;
+		
+		case SOL_select_slot:
+		if(current_fn != sv_fn) {
+			state = SOL_wait;
+		}
+		else if(FRET_1 || FRET_2 || FRET_3 || FRET_4 || FRET_5 || FRET_6 || FRET_7 || FRET_8 || FRET_9) {
+			state = SOL_select_slot;
+			selected_slot = get_fret_num();
+			is_input_triggered = true;
+		}
+		else if(FRET_11 && is_input_triggered) {
+			state = SOL_confirm_operation;
+		}
+		else {
+			state = SOL_select_slot;
+		}
+		break;
+		
+		case SOL_confirm_operation:
+		if(FRET_11) {
+			state = SOL_confirm_operation;
+		}
+		else if(!FRET_11) {
+			state = SOL_wait;
+			switch(sv_fn) {
+				case FN_SAVE: save_state(selected_slot); break;
+				case FN_LOAD: load_state(selected_slot); break;
+				default: break;
+			}
+			is_input_triggered = false;
+			selected_slot = 0;
+			current_fn = FN_NOTSELECTED;
+		}
+		break;
+		
+		default:
+		state = SOL_init;
+		break;
+	}
+	
+	switch(state) { // Actions
+		case SOL_init:
+		break;
+		
+		case SOL_wait:
+		break;
+		
+		case SOL_select_slot:
+		if(is_input_triggered) {
+			display_7segments_char(selected_slot + '0');
+		}
+		break;
+		
+		case SOL_confirm_operation:
+		if(is_input_triggered) {
+			display_7segments_char(selected_slot + '0');
+		}
+		break;
+	}
+	return state;
+};
+
+unsigned char increment_octave(unsigned char current) {
+	if(current < 9) {
+		sv_global_octave++;
+	}
+	return sv_global_octave;
+}
+unsigned char decrement_octave(unsigned char current) {
+	if(current > 0) {
+		sv_global_octave--;
+	}
+	return sv_global_octave;
+}
+unsigned char reset_octave() {
+	sv_global_octave = 0;
+	return sv_global_octave;
+}
+enum OctaveStates { O_init, O_wait, O_enabled, O_reset_octave, O_adjust_octave, O_save_quit };
+int TickFct_Octave (int state) {
+	static bool is_input_triggered = false;
+	static unsigned char current_octave = 0;
+	
+	switch(state) { // Transitions
+		case O_init:
+		state = O_wait;
+		break;
+		
+		case O_wait:
+		if(sv_fn == FN_OCTAVE) {
+			state = O_enabled;
+			current_octave = sv_global_octave;
+		}
+		else {
+			state = O_wait;
+		}
+		break;
+		
+		case O_enabled:
+		if(sv_fn != FN_OCTAVE) {
+			state = O_wait;
+		}
+		else if(FRET_11) {
+			state = O_save_quit;
+		}
+		else if(FRET_12 && FRET_13) {
+			state = O_reset_octave;
+			is_input_triggered = true;
+		}
+		else if(FRET_12 || FRET_13) {
+			state = O_adjust_octave;
+			is_input_triggered = true;
+			if(FRET_12) {
+				current_octave = increment_octave(current_octave);
+			}
+			else if(FRET_13) {
+				current_octave = decrement_octave(current_octave);
+			}
+		}
+		else {
+			state = O_enabled;
+		}
+		break;
+		
+		case O_reset_octave:
+		if(!FRET_12 && !FRET_13) {
+			state = O_enabled;
+		}
+		else {
+			state = O_reset_octave;
+		}
+		break;
+		
+		case O_adjust_octave:
+		if(FRET_12 && FRET_13) {
+			state = O_reset_octave;
+		}
+		else if(!FRET_12 && !FRET_13) {
+			state = O_enabled;
+		}
+		else if(FRET_12 || FRET_13) {
+			state = O_adjust_octave;
+		}
+		break;
+		
+		case O_save_quit:
+		if(FRET_11) { // holding
+			state = O_save_quit;
+		}
+		else { // releasing
+			state = O_wait;
+			sv_fn = FN_NOTSELECTED;
+			is_input_triggered = false;
+		}
+		break;
+		
+		default:
+		state = O_init;
+		break;
+	}
+	
+	switch(state) { // Actions
+		case O_init:
+		break;
+		
+		case O_wait:
+		break;
+		
+		case O_enabled:
+		if(is_input_triggered) {
+			display_7segments_char(current_octave + '0');
+		}
+		break;
+		
+		case O_reset_octave:
+		current_octave = reset_octave();
+		display_7segments_char(current_octave + '0');
+		break;
+		
+		case O_adjust_octave:
+		display_7segments_char(current_octave + '0');
+		break;
+		
+		case O_save_quit:
+		display_7segments_char(current_octave + '0');
 		break;
 	}
 	return state;

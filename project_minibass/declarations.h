@@ -15,6 +15,9 @@
 #define FN_NOTSELECTED 0
 #define FN_METRO 1
 #define FN_TUNING 2
+#define FN_OCTAVE 3
+#define FN_SAVE 4
+#define FN_LOAD 5
 
 #define STR_1 (~PINA & 0x01)
 #define STR_2 (~PINA & 0x02)

@@ -11,6 +11,7 @@
 #endif
 #include <avr/interrupt.h>
 #include "tasks.h"
+#include <stdlib.h>
 #define SYSTEM_PERIOD 2
 
 /******* Timer variables and functions start *******/ 
@@ -78,13 +79,28 @@ void TimerSet(unsigned long M) {
 /******* Timer variables and functions end *******/
 
 int main(void) {
+	unsigned char i; // used in for loop
 	DDRA = 0x00; PORTA = 0xFF; // set PORTA as inputs (A0..3 are strings, A4..7 are fret 14, 15, 16, 17)
 	DDRB = 0xFF; PORTB = 0x00; // set PORTB as outputs (B0..5, B7 are in 7-segment display, B6 is for the speaker)
 	DDRC = 0x00; PORTC = 0xFF; // set PORTC as inputs (C0..7 are fret 6..13)
 	DDRD = 0x07; PORTD = 0xF8; // D0..2 are outputs, D3..7 are inputs as fret 1..5
 	
+	// dynamic allocate save slots
+	sv_slots = (Pitch**) malloc(sizeof(Pitch*) * 9);
+	if(sv_slots == NULL) {
+		return 1;
+	}
+	
+	for(i=0; i<9; i++) {
+		sv_slots[i] = (Pitch*) malloc(sizeof(Pitch) * 4);
+		if(sv_slots[i] == NULL) {
+			return 1;
+		}
+	}
+	// read EEPROM and copy to the sv_slots
+	
 	// initialize tuning arrays
-	unsigned char i = 0;
+	i = 0;
 	strings_tuning[i].octave = 0;
 	strings_tuning[i].letter_idx = 4;
 	i++;
@@ -121,7 +137,7 @@ int main(void) {
 	tasks[i].state = M_init;
 	tasks[i].period = 50;
 	tasks[i].elapsedTime = tasks[i].period;
-	tasks[i].TickFct = &TickFct_metrOnome;
+	tasks[i].TickFct = &TickFct_Metronome;
 	i++;
 	tasks[i].state = BL_init;
 	tasks[i].period = SYSTEM_PERIOD;
@@ -132,6 +148,16 @@ int main(void) {
 	tasks[i].period = 50;
 	tasks[i].elapsedTime = tasks[i].period;
 	tasks[i].TickFct = &TickFct_Tuning;
+	i++;
+	tasks[i].state = SOL_init;
+	tasks[i].period = 50;
+	tasks[i].elapsedTime = tasks[i].period;
+	tasks[i].TickFct = &TickFct_SaveOrLoad;
+	i++;
+	tasks[i].state = O_init;
+	tasks[i].period = 50;
+	tasks[i].elapsedTime = tasks[i].period;
+	tasks[i].TickFct = &TickFct_Octave;
 	i++;
 	
 	PWM_on();
