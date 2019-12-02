@@ -10,7 +10,7 @@
 #ifndef ADC_H_H_
 #define ADC_H_H_
 
-#define HORIZON_NEUTRAL 141
+#define HORIZON_NEUTRAL 81
 #define VERTICAL_NETURAL 151
 
 #define F_CPU 8000000UL					/* Define CPU Frequency e.g. here its 8 Mhz */

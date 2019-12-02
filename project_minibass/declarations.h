@@ -18,13 +18,13 @@
 #define FN_OCTAVE 3
 #define FN_SAVE 4
 #define FN_LOAD 5
+#define FN_JOYFIGURE 6
 
 #define STR_1 (~PINA & 0x01)
 #define STR_2 (~PINA & 0x02)
 #define STR_3 (~PINA & 0x04)
 #define STR_4 (~PINA & 0x08)
 
-#define JOY_UP 
 
 #define FRET_1 (~PIND & 0x08)
 #define FRET_2 (~PIND & 0x10)

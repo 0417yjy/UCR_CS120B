@@ -29,11 +29,10 @@ enum joy_directions {joy_neut, joy_u, joy_d, joy_l, joy_r};
 typedef struct Saving_Slot {
 	unsigned char global_octave;
 	Pitch strings_tuning[4];
-	bool joystick_use;
 	unsigned char joystick_str[4]; // {u, d, l, r}
 } Saving_Slot;
 
-#define TASK_SIZE 9
+#define TASK_SIZE 10
 Task tasks[TASK_SIZE];
 
 const float pitches_octave1[12] = { PITCH_C1, PITCH_CS1, PITCH_D1, PITCH_DS1, PITCH_E1, PITCH_F1, PITCH_FS1, PITCH_G1, PITCH_GS1, PITCH_A1, PITCH_AS1, PITCH_B1 };
@@ -239,7 +238,7 @@ int get_joystick_direction() {
 	}
 	
 	adc_value = ADC_Read(0); // get X value (horizonal)
-	if(adc_value < HORIZON_NEUTRAL - 50) {
+	if(adc_value < HORIZON_NEUTRAL) {
 		return joy_l;
 	}
 	else if(adc_value > HORIZON_NEUTRAL + 600) {
@@ -459,6 +458,14 @@ void display_7segments_char(char ch) {
 		SEVEN_D_ON();
 		SEVEN_E_ON();
 		SEVEN_F_ON();
+		break;
+		
+		case 'J':
+		// turn on bcde
+		SEVEN_B_ON();
+		SEVEN_C_ON();
+		SEVEN_D_ON();
+		SEVEN_E_ON();
 		break;
 		
 		case 'L':
@@ -741,6 +748,10 @@ int TickFct_SelectFunction (int state) {
 			state = SF_select_fn;
 			sv_fn = FN_OCTAVE;
 		}
+		else if(FRET_17) {
+			state = SF_select_fn;
+			sv_fn = FN_JOYFIGURE;
+		}
 		else if(sv_fn != FN_TUNING && sv_fn != FN_OCTAVE && FRET_12) {
 			state = SF_select_fn;
 			sv_fn = FN_LOAD;
@@ -795,6 +806,10 @@ int TickFct_SelectFunction (int state) {
 			
 			case FN_SAVE:
 			display_7segments_char('S');
+			break;
+			
+			case FN_JOYFIGURE:
+			display_7segments_char('J');
 			break;
 			
 			default:
@@ -1014,6 +1029,7 @@ enum TuningStates { T_init, T_wait, T_select_str, T_reset_tune, T_adjust_tune, T
 int TickFct_Tuning (int state) {
 	static unsigned char selected_str = 0;
 	static bool is_input_triggered = false;
+	int current_joy_direction;
 	
 	switch(state) { // Transitions
 		case T_init:
@@ -1028,9 +1044,11 @@ int TickFct_Tuning (int state) {
 		if(sv_fn != FN_TUNING) {
 			state = T_wait;
 		}
-		else if(is_str_pressed()) {
+		//else if(is_str_pressed()) {
+		else if(current_joy_direction = get_joystick_direction()) {
 			state = T_select_str;
-			selected_str = get_str_num(selected_str);
+			//selected_str = get_str_num(selected_str);
+			selected_str = get_str_num_joy(current_joy_direction);
 			is_input_triggered = true;
 		}
 		else if(FRET_11) {
@@ -1339,6 +1357,98 @@ int TickFct_Octave (int state) {
 		
 		case O_save_quit:
 		display_7segments_char(current_octave + '0');
+		break;
+	}
+	return state;
+};
+
+void set_direction_str(int direction, unsigned char str) {
+	current_settings.joystick_str[direction - 1] = str;
+}
+enum JoystickConfigureStates { JC_init, JC_wait, JC_select_direction, JC_select_str, JC_save_quit };
+int TickFct_JoystickConfigure (int state) {
+	static bool is_input_triggered = false;
+	static int selected_direction;
+	unsigned char str_num;
+	
+	switch(state) { // Transitions
+		case JC_init:
+		state = JC_wait;
+		
+		case JC_wait:
+		state = (sv_fn == FN_JOYFIGURE) ? JC_select_direction : JC_wait;
+		break;
+		
+		case JC_select_direction:
+		if(FRET_11) {
+			state = JC_save_quit;
+		}
+		else if(get_joystick_direction()) {
+			selected_direction = get_joystick_direction();
+			is_input_triggered = true;
+			state = JC_select_direction;
+		}
+		else if(str_num = get_fret_num() && is_input_triggered) {
+			METRO_LED_ON();
+			if(str_num >= 1 && str_num <= 4) {
+				set_direction_str(selected_direction, str_num);
+				state = JC_select_str;
+			}
+		}
+		else {
+			state = JC_select_direction;
+		}
+		break;
+		
+		case JC_select_str:
+		if(!(FRET_1 || FRET_2 || FRET_3 || FRET_4)) {
+			state = JC_select_direction;
+		}
+		else {
+			state = JC_select_str;
+		}
+		break;
+		
+		case JC_save_quit:
+		if(FRET_11) {
+			state = JC_save_quit;
+		}
+		else {
+			state = JC_wait;
+			selected_direction = 0;
+			sv_fn = FN_NOTSELECTED;
+			is_input_triggered = false;
+		}
+		break;
+		
+		default:
+		state = JC_init;
+		break;
+	}
+	
+	switch(state) { // Actions
+		case JC_init:
+		break;
+		
+		case JC_wait:
+		break;
+		
+		case JC_select_direction:
+		if(is_input_triggered) {
+			display_7segments_char(current_settings.joystick_str[selected_direction - 1] + '0');
+		}
+		break;
+		
+		case JC_select_str:
+		if(is_input_triggered) {
+			display_7segments_char(current_settings.joystick_str[selected_direction - 1] + '0');
+		}
+		break;
+		
+		case JC_save_quit:
+		if(is_input_triggered) {
+			display_7segments_char(current_settings.joystick_str[selected_direction - 1] + '0');
+		}
 		break;
 	}
 	return state;
