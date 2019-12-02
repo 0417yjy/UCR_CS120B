@@ -12,6 +12,7 @@
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include "tasks.h"
+#include "adc.h"
 #include <stdlib.h>
 #define SYSTEM_PERIOD 2
 
@@ -84,19 +85,24 @@ void initialize_EEPROM() {
 	unsigned char i, j;
 	for(i=0;i<9;i++) {
 		// default settings: octave = 0, E standard tuning
-		j=0;
 		tmp_eeslots[i].global_octave = 0;
+		tmp_eeslots[i].joystick_use = true;
+		j=0;
 		tmp_eeslots[i].strings_tuning[j].octave = 0;
 		tmp_eeslots[i].strings_tuning[j].letter_idx = 4;
+		tmp_eeslots[i].joystick_str[j] = 4;
 		j++;
 		tmp_eeslots[i].strings_tuning[j].octave = 0;
 		tmp_eeslots[i].strings_tuning[j].letter_idx = 9;
+		tmp_eeslots[i].joystick_str[j] = 1;
 		j++;
 		tmp_eeslots[i].strings_tuning[j].octave = 1;
 		tmp_eeslots[i].strings_tuning[j].letter_idx = 2;
+		tmp_eeslots[i].joystick_str[j] = 2;
 		j++;
 		tmp_eeslots[i].strings_tuning[j].octave = 1;
 		tmp_eeslots[i].strings_tuning[j].letter_idx = 7;
+		tmp_eeslots[i].joystick_str[j] = 3;
 	}
 	
 	eeprom_update_block((const void*)&tmp_eeslots, (void*)&sv_slots, sizeof(Saving_Slot) * 9 /* 9x9 = 81*/);
@@ -110,7 +116,7 @@ int main(void) {
 	DDRD = 0x07; PORTD = 0xF8; // D0..2 are outputs, D3..7 are inputs as fret 1..5
 	
 	//initialize EEPROM
-	//initialize_EEPROM();
+	initialize_EEPROM();
 	
 	// initialize tuning arrays (load from save slot 1)
 	eeprom_read_block((void*)&current_settings, (const void*)&sv_slots, sizeof(Saving_Slot) * 9);
@@ -177,6 +183,7 @@ int main(void) {
 	i++;
 	
 	PWM_on();
+	ADC_Init();
 	TimerSet(SYSTEM_PERIOD);
 	TimerOn();
 	

@@ -6,6 +6,7 @@
  */ 
 #include "declarations.h"
 #include <avr/eeprom.h>
+#include "adc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -24,9 +25,12 @@ typedef struct Pitch {
 	unsigned char letter_idx;
 } Pitch;
 
+enum joy_directions {joy_neut, joy_u, joy_d, joy_l, joy_r};
 typedef struct Saving_Slot {
 	unsigned char global_octave;
 	Pitch strings_tuning[4];
+	bool joystick_use;
+	unsigned char joystick_str[4]; // {u, d, l, r}
 } Saving_Slot;
 
 #define TASK_SIZE 9
@@ -40,7 +44,7 @@ unsigned char pressed_fret_num;
 unsigned char pressed_str_num;
 char sv_bpm_buffer[4] = "000";
 unsigned short sv_metro_bpm;
-unsigned char sv_global_octave;
+bool sv_joystick_enabled;
 Saving_Slot EEMEM sv_slots[9];
 Saving_Slot current_settings;
 
@@ -216,8 +220,38 @@ unsigned char get_str_num(unsigned char old_str_num) {
 	return 0;
 }
 
+unsigned char get_str_num_joy(int detected_direction) {
+	if(detected_direction > 0) {
+		return current_settings.joystick_str[detected_direction - 1];
+	}
+	return 0;
+}
+
+int get_joystick_direction() {
+	int adc_value;
+	
+	adc_value = ADC_Read(1);
+	if(adc_value > VERTICAL_NETURAL + 600) {
+		return joy_d;
+	}
+	else if(adc_value < VERTICAL_NETURAL - 50) {
+		return joy_u;
+	}
+	
+	adc_value = ADC_Read(0); // get X value (horizonal)
+	if(adc_value < HORIZON_NEUTRAL - 50) {
+		return joy_l;
+	}
+	else if(adc_value > HORIZON_NEUTRAL + 600) {
+		return joy_r;
+	}
+	return joy_neut;
+}
+
 enum ButtonInputStates { BI_init, BI_idle, BI_fingering, BI_playing };
 int TickFct_ButtonInput (int state) {
+	int current_joy_direction;
+	
 	switch(state) { // Transitions
 		case BI_init:
 		state = BI_idle;
@@ -227,7 +261,8 @@ int TickFct_ButtonInput (int state) {
 		
 		case BI_idle:
 		if(sv_mod == FP) {
-			if(is_str_pressed()) {
+			//if(is_str_pressed()) {
+			if(current_joy_direction = get_joystick_direction()) {
 				state = BI_playing;
 			}
 			else if(is_fret_pressed()) {
@@ -243,7 +278,8 @@ int TickFct_ButtonInput (int state) {
 		break;
 		
 		case BI_fingering:
-		if(is_str_pressed()) {
+		//if(is_str_pressed()) {
+		if(current_joy_direction = get_joystick_direction()) {
 			state = BI_playing;
 		}
 		else if(is_fret_pressed()) {
@@ -255,7 +291,8 @@ int TickFct_ButtonInput (int state) {
 		break;
 		
 		case BI_playing:
-		if(is_str_pressed()) {
+		//if(is_str_pressed()) {
+		if(current_joy_direction = get_joystick_direction()) {
 			state = BI_playing;
 		}
 		else if(is_fret_pressed()) {
@@ -286,7 +323,8 @@ int TickFct_ButtonInput (int state) {
 		
 		case BI_playing:
 		pressed_fret_num = get_fret_num();
-		pressed_str_num = get_str_num(pressed_str_num);
+		//pressed_str_num = get_str_num(pressed_str_num);
+		pressed_str_num = get_str_num_joy(current_joy_direction);
 		break;
 	}
 	return state;
@@ -352,7 +390,7 @@ void play_note(unsigned char fret, unsigned char str) {
 	}
 	
 	// desired_frequency = (double) tmp_octave * pitches_octave1[tmp_letter_idx];
-	desired_frequency = pow(2, tmp_octave + sv_global_octave) * pitches_octave1[tmp_letter_idx];
+	desired_frequency = pow(2, tmp_octave + current_settings.global_octave) * pitches_octave1[tmp_letter_idx];
 	set_PWM(desired_frequency);
 }
 void display_7segments_char(char ch) {
@@ -1180,19 +1218,19 @@ int TickFct_SaveOrLoad (int state) {
 
 unsigned char increment_octave(unsigned char current) {
 	if(current < 9) {
-		sv_global_octave++;
+		current_settings.global_octave++;
 	}
-	return sv_global_octave;
+	return current_settings.global_octave;
 }
 unsigned char decrement_octave(unsigned char current) {
 	if(current > 0) {
-		sv_global_octave--;
+		current_settings.global_octave--;
 	}
-	return sv_global_octave;
+	return current_settings.global_octave;
 }
 unsigned char reset_octave() {
-	sv_global_octave = 0;
-	return sv_global_octave;
+	current_settings.global_octave = 0;
+	return current_settings.global_octave;
 }
 enum OctaveStates { O_init, O_wait, O_enabled, O_reset_octave, O_adjust_octave, O_save_quit };
 int TickFct_Octave (int state) {
@@ -1207,7 +1245,7 @@ int TickFct_Octave (int state) {
 		case O_wait:
 		if(sv_fn == FN_OCTAVE) {
 			state = O_enabled;
-			current_octave = sv_global_octave;
+			current_octave = current_settings.global_octave;
 		}
 		else {
 			state = O_wait;

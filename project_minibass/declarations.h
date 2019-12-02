@@ -24,6 +24,8 @@
 #define STR_3 (~PINA & 0x04)
 #define STR_4 (~PINA & 0x08)
 
+#define JOY_UP 
+
 #define FRET_1 (~PIND & 0x08)
 #define FRET_2 (~PIND & 0x10)
 #define FRET_3 (~PIND & 0x20)
