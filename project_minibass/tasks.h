@@ -1388,8 +1388,7 @@ int TickFct_JoystickConfigure (int state) {
 			is_input_triggered = true;
 			state = JC_select_direction;
 		}
-		else if(str_num = get_fret_num() && is_input_triggered) {
-			METRO_LED_ON();
+		else if((str_num = get_fret_num()) && is_input_triggered) {
 			if(str_num >= 1 && str_num <= 4) {
 				set_direction_str(selected_direction, str_num);
 				state = JC_select_str;
